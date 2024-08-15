@@ -22,6 +22,8 @@
 #include "progressbar.h"
 #include "thread.h"
 
+#include <filesystem>
+
 constexpr size_t default_permutations = 1e8;
 
 using namespace MR;
@@ -135,7 +137,10 @@ protected:
 };
 
 void run() {
-  auto directions = DWI::Directions::load_cartesian(argument[0]);
+  const std::filesystem::path input_path{argument[0]};
+  const std::filesystem::path output_path{argument[1]};
+
+  auto directions = DWI::Directions::load_cartesian(input_path);
 
   size_t num_permutations = get_option_value<size_t>("permutations", default_permutations);
 
@@ -150,5 +155,5 @@ void run() {
     if (signs[n] < 0)
       directions.row(n) *= -1.0;
 
-  DWI::Directions::save(directions, argument[1], !get_options("cartesian").empty());
+  DWI::Directions::save(directions, output_path, !get_options("cartesian").empty());
 }

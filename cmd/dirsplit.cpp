@@ -20,6 +20,8 @@
 #include "progressbar.h"
 #include "thread.h"
 
+#include <filesystem>
+
 constexpr size_t default_permutations = 1e8;
 
 using namespace MR;
@@ -154,7 +156,9 @@ protected:
 };
 
 void run() {
-  auto directions = DWI::Directions::load_cartesian(argument[0]);
+  const std::filesystem::path input_path{argument[0]};
+
+  auto directions = DWI::Directions::load_cartesian(input_path);
 
   const size_t num_subsets = argument.size() - 1;
   if (num_subsets == 1)
@@ -171,9 +175,10 @@ void run() {
 
   const bool cartesian = !get_options("cartesian").empty();
   for (size_t i = 0; i < best.size(); ++i) {
+    const std::filesystem::path output_path{argument[i + 1]};
     Eigen::MatrixXd output(best[i].size(), 3);
     for (size_t n = 0; n < best[i].size(); ++n)
       output.row(n) = directions.row(best[i][n]);
-    DWI::Directions::save(output, argument[i + 1], cartesian);
+    DWI::Directions::save(output, output_path, cartesian);
   }
 }
