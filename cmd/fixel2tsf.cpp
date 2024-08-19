@@ -29,6 +29,8 @@
 #include "dwi/tractography/mapping/loader.h"
 #include "dwi/tractography/mapping/mapper.h"
 
+#include <filesystem>
+
 using namespace MR;
 using namespace App;
 
@@ -68,6 +70,7 @@ void usage() {
 using SetVoxelDir = DWI::Tractography::Mapping::SetVoxelDir;
 
 void run() {
+  const std::filesystem::path input_path
   auto in_data_image = Fixel::open_fixel_data_file<float>(argument[0]);
   if (in_data_image.size(2) != 1)
     throw Exception("Only a single scalar value for each fixel can be output as a track scalar file, "
