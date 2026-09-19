@@ -1,0 +1,50 @@
+#!/bin/bash
+# Verify that sh2lobes segments the same set of lobes as fod2fixel.
+#
+# Both commands drive the same FMLS segmenter over the same 1281-direction set, and both report
+#   the weighted mean direction of each lobe by default, so for a given input they must agree
+#   exactly. sh2lobes previously forced the segmenter's peak-amplitude threshold to zero, which
+#   retained every positive lobe and inflated the fixel count relative to fod2fixel; it now
+#   loads the shared -fmls_* options instead, so the default is the common default of 0.1 and
+#   the old behaviour remains available through -fmls_no_thresholds.
+rm -rf tmp*
+DATA="$(dirname "$0")/data"
+
+# the two commands agree, fixel for fixel, on a phantom both segment fully. Note that a direct
+#   comparison of the fixel files is only meaningful because every voxel of these phantoms holds
+#   the same FOD: the order in which voxels reach the receiver, and hence the order in which
+#   their fixels are stored, depends on the segmenter's threads and is not reproducible between
+#   runs of either command. It is the per-voxel fixel count and direction that must agree.
+sh2lobes  "$DATA/crossing_lmax8_alpha42.mif" tmp_sh2lobes
+fod2fixel "$DATA/crossing_lmax8_alpha42.mif" tmp_fod2fixel
+testing_diff_fixel tmp_sh2lobes tmp_fod2fixel
+
+# weakcrossing_lmax8.mif adds a second lobe that peaks at 0.052, below the default threshold of
+#   0.1: it is discarded by default and retained once thresholding is disabled. This is what
+#   distinguishes the two settings -- the symmetric phantoms cannot, as their lobes all peak
+#   well above 0.1.
+sh2lobes "$DATA/weakcrossing_lmax8.mif" tmp_default
+[ "$(mrinfo tmp_default/index.mif -property nfixels)" = "8" ]
+
+sh2lobes "$DATA/weakcrossing_lmax8.mif" tmp_nothresholds -fmls_no_thresholds
+[ "$(mrinfo tmp_nothresholds/index.mif -property nfixels)" = "16" ]
+
+# and the default is the one that agrees with fod2fixel
+fod2fixel "$DATA/weakcrossing_lmax8.mif" tmp_weak_fod2fixel
+testing_diff_fixel tmp_default tmp_weak_fod2fixel
+
+# an explicit -fmls_peak_value is honoured, on either side of that lobe's peak amplitude
+sh2lobes "$DATA/weakcrossing_lmax8.mif" tmp_lenient -fmls_peak_value 0.01
+[ "$(mrinfo tmp_lenient/index.mif -property nfixels)" = "16" ]
+
+sh2lobes "$DATA/weakcrossing_lmax8.mif" tmp_strict -fmls_peak_value 0.2
+[ "$(mrinfo tmp_strict/index.mif -property nfixels)" = "8" ]
+
+# the lobe that survives is the strong one, not the faint one. Peak amplitude identifies it
+#   exactly: the two peaks are 1 - 1.16*cos^8(42 deg) = 0.8921 along +z and
+#   0.16 - 1.16*cos^8(42 deg) = 0.0521 along +x. Unlike the width, this is not quantised by the
+#   direction set, since the segmenter refines each peak by Newton optimisation.
+sh2lobes "$DATA/weakcrossing_lmax8.mif" tmp_amp_fixel -peak_amp tmp_amp.mif
+mrstats tmp_amp.mif -allvolumes -output min -output max > tmp_amp.txt
+echo "0.8921 0.8921" > tmp_amp_want.txt
+testing_diff_matrix tmp_amp.txt tmp_amp_want.txt -abs 1e-3

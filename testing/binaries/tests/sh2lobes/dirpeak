@@ -1,0 +1,24 @@
+#!/bin/bash
+# The width is measured from the fixel direction, which is the amplitude-weighted mean direction
+#   of the lobe by default and the direction of the maximal peak under -dirpeak.
+# For an axially symmetric lobe the two coincide, so both invocations must yield the same
+#   direction and the same width; in particular the width measured from the peak direction must
+#   not collapse to zero.
+rm -rf tmp*
+DATA="$(dirname "$0")/data"
+
+sh2lobes "$DATA/cone_lmax4_alpha60.mif" tmp_mean -lobe_width tmp_mean_width.mif
+sh2lobes "$DATA/cone_lmax4_alpha60.mif" tmp_peak -lobe_width tmp_peak_width.mif -dirpeak
+
+mrstats tmp_mean_width.mif -allvolumes -output min -output max > tmp_mean.txt
+mrstats tmp_peak_width.mif -allvolumes -output min -output max > tmp_peak.txt
+echo "84.85 84.85" > tmp_want.txt
+testing_diff_matrix tmp_mean.txt tmp_want.txt -abs 2.0
+testing_diff_matrix tmp_peak.txt tmp_want.txt -abs 2.0
+
+# the two references agree with each other more tightly than either does with the analytic value
+testing_diff_matrix tmp_mean.txt tmp_peak.txt -abs 0.5
+
+fixel2peaks tmp_mean tmp_mean_peaks.mif
+fixel2peaks tmp_peak - | \
+testing_diff_peaks - tmp_mean_peaks.mif 1e-4

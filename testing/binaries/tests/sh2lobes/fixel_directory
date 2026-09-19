@@ -1,0 +1,48 @@
+#!/bin/bash
+# Verify that the command writes a well-formed fixel directory:
+#   the output directory is created if it does not exist; the directions file is N x 3 x 1; the
+#   scalar metric images are written outside the fixel directory, at the path given, rather than
+#   as fixel data files within it; the metric outputs are optional; and the result is readable by
+#   other fixel commands.
+#
+# The phantom is 2x2x2 voxels with one lobe each, so the fixel count is 8.
+rm -rf tmp*
+DATA="$(dirname "$0")/data"
+
+# tmp_fixel does not exist yet; the command must create it
+sh2lobes "$DATA/cone_lmax4_alpha60.mif" tmp_fixel -lobe_width tmp_width.mif -peak_amp tmp_amp.mif
+
+[ "$(mrinfo tmp_fixel/index.mif -size)" = "2 2 2 2" ]
+[ "$(mrinfo tmp_fixel/directions.mif -size)" = "8 3 1" ]
+[ "$(mrinfo tmp_fixel/index.mif -property nfixels)" = "8" ]
+
+# the metrics are 4D voxel images, not fixel data files: they carry the spatial dimensions of
+#   the input, with one volume per fixel, and are not written into the fixel directory
+[ "$(mrinfo tmp_width.mif -size)" = "2 2 2 1" ]
+[ "$(mrinfo tmp_amp.mif -size)" = "2 2 2 1" ]
+[ ! -e tmp_fixel/tmp_width.mif ]
+[ ! -e tmp_fixel/tmp_amp.mif ]
+
+# the peak amplitude is that of the analytic profile: 1 - cos^4(60 deg) = 0.9375
+mrstats tmp_amp.mif -allvolumes -output min -output max > tmp_amp.txt
+echo "0.9375 0.9375" > tmp_amp_want.txt
+testing_diff_matrix tmp_amp.txt tmp_amp_want.txt -abs 1e-3
+
+# the metric outputs are optional; without them only index and directions are written
+sh2lobes "$DATA/cone_lmax4_alpha60.mif" tmp_bare
+[ ! -e tmp_bare_width.mif ]
+[ ! -e tmp_bare_amp.mif ]
+[ "$(ls tmp_bare | sort | tr '\n' ' ')" = "directions.mif index.mif " ]
+
+# -nii switches the format of the index and directions files
+sh2lobes "$DATA/cone_lmax4_alpha60.mif" tmp_nii -nii
+[ -e tmp_nii/index.nii ]
+[ -e tmp_nii/directions.nii ]
+
+# the output is reproducible, and is a valid fixel directory as far as other commands
+#   are concerned
+sh2lobes "$DATA/cone_lmax4_alpha60.mif" tmp_repeat -lobe_width tmp_repeat_width.mif -peak_amp tmp_repeat_amp.mif
+testing_diff_fixel tmp_fixel tmp_repeat
+testing_diff_image tmp_width.mif tmp_repeat_width.mif -abs 1e-6
+fixel2peaks tmp_fixel tmp_peaks.mif
+[ "$(mrinfo tmp_peaks.mif -size)" = "2 2 2 3" ]

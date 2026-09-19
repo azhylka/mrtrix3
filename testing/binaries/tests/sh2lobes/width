@@ -1,0 +1,36 @@
+#!/bin/bash
+# Verify that the reported lobe width is the angular extent of the core of the FOD lobe, in
+#   degrees: twice the largest angle between the fixel direction and any direction of the lobe
+#   at which the amplitude reaches a quarter of the lobe's maximum.
+#
+# The input phantoms in data/ are FODs of the analytic form
+#     A(theta) = cos^2n(theta) - cos^2n(alpha)
+# which is exactly representable at lmax = 2n and peaks at A(0) = 1 - cos^2n(alpha). Writing
+#   k = cos^2n(alpha), the quarter-amplitude contour is at
+#     cos^2n(theta) - k = 0.25 * (1 - k)   =>   theta = acos( (0.25 + 0.75k)^(1/2n) )
+#   and the expected width is twice that: 113.55, 84.85 and 66.36 degrees for the three cones.
+#   Note that this is not 2*alpha -- that was the extent out to the zero crossing, which is the
+#   full lobe rather than its core.
+#
+# The last phantom, cos^2(theta) + 0.05, is positive in every direction, so under the previous
+#   measure its lobe spanned the whole sphere and the width saturated at 180 degrees. Its core
+#   is bounded well inside that: cos^2(theta) + 0.05 = 0.25 * 1.05 gives 125.10 degrees.
+#
+# Quantised by the 1281 directions that the segmenter samples the reported values fall a little
+#   short of these, by at most 0.7 degrees; a tolerance of 2 degrees is applied.
+rm -rf tmp*
+DATA="$(dirname "$0")/data"
+
+# check_width <phantom> <expected width in degrees>
+check_width () {
+    rm -rf tmp_fixel tmp_width.mif
+    sh2lobes "$DATA/$1" tmp_fixel -lobe_width tmp_width.mif
+    mrstats tmp_width.mif -allvolumes -output min -output max > tmp_got.txt
+    echo "$2 $2" > tmp_want.txt
+    testing_diff_matrix tmp_got.txt tmp_want.txt -abs 2.0
+}
+
+check_width cone_lmax2_alpha75.mif      113.55
+check_width cone_lmax4_alpha60.mif       84.85
+check_width cone_lmax6_alpha45.mif       66.36
+check_width positive_definite_lmax2.mif 125.10

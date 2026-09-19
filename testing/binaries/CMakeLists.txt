@@ -378,6 +378,14 @@ add_bash_binary_test(sh2amp/grad)
 add_bash_binary_test(sh2amp/msmt)
 add_bash_binary_test(sh2amp/nonnegative)
 
+add_bash_binary_test(sh2lobes/crossing)
+add_bash_binary_test(sh2lobes/dirpeak)
+add_bash_binary_test(sh2lobes/fixel_directory)
+add_bash_binary_test(sh2lobes/metric_image)
+add_bash_binary_test(sh2lobes/orientation)
+add_bash_binary_test(sh2lobes/thresholds)
+add_bash_binary_test(sh2lobes/width)
+
 add_bash_binary_test(sh2peaks/default)
 add_bash_binary_test(sh2peaks/fast)
 

@@ -1,0 +1,49 @@
+#!/bin/bash
+# Verify the form of the 4D scalar metric images that sh2lobes writes.
+#
+# Each metric is an ordinary voxel image carrying the spatial dimensions and transform of the
+#   input FOD image, its fourth axis indexing the fixels within each voxel. The length of that
+#   axis is the largest number of fixels found in any voxel, and voxels holding fewer fixels --
+#   including voxels holding none at all -- are padded with NaN rather than with zero.
+#
+# Both phantoms are 2x2x2 voxels: the cone has one lobe per voxel, the crossing has two.
+rm -rf tmp*
+DATA="$(dirname "$0")/data"
+
+# the fourth axis is sized by the largest fixel count encountered
+sh2lobes "$DATA/crossing_lmax8_alpha42.mif" tmp_two -lobe_width tmp_two_width.mif
+[ "$(mrinfo tmp_two_width.mif -size)" = "2 2 2 2" ]
+
+sh2lobes "$DATA/cone_lmax4_alpha60.mif" tmp_one -lobe_width tmp_one_width.mif
+[ "$(mrinfo tmp_one_width.mif -size)" = "2 2 2 1" ]
+
+# -maxnum bounds it, since the discarded lobes never reach the writer
+sh2lobes "$DATA/crossing_lmax8_alpha42.mif" tmp_capped -lobe_width tmp_capped_width.mif -maxnum 1
+[ "$(mrinfo tmp_capped_width.mif -size)" = "2 2 2 1" ]
+
+# the spatial geometry is that of the input, not that of the fixel directory
+[ "$(mrinfo tmp_two_width.mif -spacing | cut -d' ' -f1-3)" \
+  = "$(mrinfo "$DATA/crossing_lmax8_alpha42.mif" -spacing | cut -d' ' -f1-3)" ]
+mrinfo tmp_two_width.mif -transform > tmp_transform.txt
+mrinfo "$DATA/crossing_lmax8_alpha42.mif" -transform > tmp_transform_want.txt
+testing_diff_matrix tmp_transform.txt tmp_transform_want.txt -abs 1e-6
+
+# voxels excluded by -mask are padded with NaN rather than zero: mrstats accumulates only
+#   finite values, so of the 16 voxel-volumes only the 8 fixels of the 4 retained voxels count
+sh2lobes "$DATA/crossing_lmax8_alpha42.mif" tmp_masked -lobe_width tmp_masked_width.mif \
+    -mask "$DATA/halfmask.mif"
+[ "$(mrinfo tmp_masked_width.mif -size)" = "2 2 2 2" ]
+mrstats tmp_masked_width.mif -allvolumes -output count > tmp_count.txt
+echo "8" > tmp_count_want.txt
+testing_diff_matrix tmp_count.txt tmp_count_want.txt -abs 1e-6
+
+# a zero fill would drag the minimum down; the widths that are present are unchanged by masking
+mrstats tmp_masked_width.mif -allvolumes -output min -output max > tmp_masked.txt
+echo "54.68 54.68" > tmp_masked_want.txt
+testing_diff_matrix tmp_masked.txt tmp_masked_want.txt -abs 4.0
+
+# both metrics are written in this form, and independently of one another
+sh2lobes "$DATA/crossing_lmax8_alpha42.mif" tmp_both -lobe_width tmp_both_width.mif \
+    -peak_amp tmp_both_amp.mif
+[ "$(mrinfo tmp_both_amp.mif -size)" = "2 2 2 2" ]
+testing_diff_image tmp_both_width.mif tmp_two_width.mif -abs 1e-6

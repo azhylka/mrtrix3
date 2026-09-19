@@ -1,0 +1,44 @@
+#!/bin/bash
+# Verify segmentation and width estimation where a voxel contains two fibre populations.
+#
+# The phantom is the sum of two  cos^8(theta) - cos^8(42 deg)  profiles, oriented along z and
+#   along x. Each is positive only within a cone of half-angle 42 degrees about its own axis,
+#   and since the two axes are 90 degrees apart the two lobes are separated by a region in which
+#   the FOD is negative: each lobe is delimited by its own zero crossing rather than by a
+#   watershed between the two, and both lobes have the same width by symmetry.
+# The reported width is that of the lobe's core, out to the quarter-amplitude contour rather
+#   than to the zero crossing. Each lobe peaks at 1 - 2*cos^8(42 deg) = 0.814 along its own axis,
+#   and the contour at a quarter of that is 54.68 degrees across; a tolerance of 4 degrees is
+#   applied, as the boundary is not a circle of constant theta and so is sampled less evenly
+#   than that of an isolated cone.
+#
+# The phantom is 2x2x2 voxels with two lobes each, so the fixel count is 16.
+rm -rf tmp*
+DATA="$(dirname "$0")/data"
+
+sh2lobes "$DATA/crossing_lmax8_alpha42.mif" tmp_fixel -lobe_width tmp_width.mif
+[ "$(mrinfo tmp_fixel/index.mif -property nfixels)" = "16" ]
+
+# two fixels in every voxel
+mrconvert tmp_fixel/index.mif -coord 3 0 - | \
+mrstats - -output min -output max > tmp_count.txt
+echo "2 2" > tmp_count_want.txt
+testing_diff_matrix tmp_count.txt tmp_count_want.txt -abs 1e-6
+
+# both lobes are narrower than the single-fibre case, and equal to one another;
+#   -allvolumes pools the two fixels of each voxel into a single set of statistics
+mrstats tmp_width.mif -allvolumes -output min -output max > tmp_width.txt
+echo "54.68 54.68" > tmp_width_want.txt
+testing_diff_matrix tmp_width.txt tmp_width_want.txt -abs 4.0
+
+# -maxnum retains only the largest lobe of each voxel
+sh2lobes "$DATA/crossing_lmax8_alpha42.mif" tmp_one -maxnum 1
+[ "$(mrinfo tmp_one/index.mif -property nfixels)" = "8" ]
+
+# -mask restricts the computation to the selected voxels, leaving the rest of the volume empty
+sh2lobes "$DATA/crossing_lmax8_alpha42.mif" tmp_masked -mask "$DATA/halfmask.mif"
+[ "$(mrinfo tmp_masked/index.mif -property nfixels)" = "8" ]
+mrconvert tmp_masked/index.mif -coord 3 0 - | \
+mrstats - -output min -output max > tmp_masked_count.txt
+echo "0 2" > tmp_masked_count_want.txt
+testing_diff_matrix tmp_masked_count.txt tmp_masked_count_want.txt -abs 1e-6

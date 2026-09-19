@@ -1,0 +1,18 @@
+#!/bin/bash
+# Verify that the lobe width does not depend on how the lobe is oriented relative to the
+#   direction set that the segmenter samples internally.
+#
+# The phantom is the same  cos^4(theta) - cos^4(60 deg)  profile used by the sh2lobes/width
+#   test, but built about (1,2,3)/sqrt(14) rather than about z. The expected width is unchanged
+#   at 84.85 degrees, and the fixel direction must recover the axis the phantom was built about.
+rm -rf tmp*
+DATA="$(dirname "$0")/data"
+
+sh2lobes "$DATA/cone_lmax4_alpha60_oblique.mif" tmp_fixel -lobe_width tmp_width.mif
+
+mrstats tmp_width.mif -allvolumes -output min -output max > tmp_got.txt
+echo "84.85 84.85" > tmp_want.txt
+testing_diff_matrix tmp_got.txt tmp_want.txt -abs 2.0
+
+fixel2peaks tmp_fixel - | \
+testing_diff_peaks - "$DATA/oblique_axis_peaks.mif" 1e-4

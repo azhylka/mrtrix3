@@ -16,3 +16,6 @@
 *.svg       binary -diff
 
 
+# Test image data: a text header followed by a raw binary payload,
+#   which must never be subject to line-ending conversion
+*.mif       binary -diff

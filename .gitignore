@@ -35,3 +35,6 @@ build/
 CMakeLists.txt.user
 testing/data/tmp*
 testing/data/*-tmp-*
+
+# ...except the analytically-constructed FOD phantoms used by the sh2lobes tests
+!testing/binaries/tests/sh2lobes/data/*.mif
